@@ -1,0 +1,13 @@
+{
+  "name": "fuel-stock-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fuel station stock, sales and price management - zero external dependencies, uses Node's built-in http and sqlite modules only.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
