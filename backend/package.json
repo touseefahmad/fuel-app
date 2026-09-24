@@ -1,0 +1,16 @@
+{
+  "name": "fuel-stock-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fuel station stock, sales and price management - Node's built-in http server, MongoDB for storage.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "mongodb": "^6.10.0"
+  }
+}
