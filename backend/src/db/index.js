@@ -10,23 +10,38 @@ let client = null;
 let dbInstance = null;
 let connecting = null;
 
+// Retries on startup instead of failing on the first attempt - matters in
+// Docker Compose (and similar orchestration) where the app container can
+// start slightly before the MongoDB container has finished initializing.
+// Configurable via env vars; the defaults (15 attempts, 2s apart = up to
+// ~30s) are generous enough for that race without masking a genuinely
+// absent/misconfigured MongoDB for long.
 async function connect() {
   if (dbInstance) return dbInstance;
   if (connecting) return connecting;
+  const maxAttempts = Number(process.env.MONGODB_CONNECT_RETRIES || 15);
+  const delayMs = Number(process.env.MONGODB_CONNECT_RETRY_DELAY_MS || 2000);
+
   connecting = (async () => {
-    client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
-    try {
-      await client.connect();
-    } catch (err) {
-      console.error('\nCould not connect to MongoDB.');
-      console.error(`Tried: ${uri}`);
-      console.error('Make sure MongoDB is installed and running - see README.md for setup steps.');
-      console.error(`Original error: ${err.message}\n`);
-      process.exit(1);
+    let lastErr;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
+      try {
+        await client.connect();
+        dbInstance = client.db(dbName);
+        await ensureIndexes(dbInstance);
+        return dbInstance;
+      } catch (err) {
+        lastErr = err;
+        console.error(`MongoDB connection attempt ${attempt}/${maxAttempts} failed: ${err.message}`);
+        if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs));
+      }
     }
-    dbInstance = client.db(dbName);
-    await ensureIndexes(dbInstance);
-    return dbInstance;
+    console.error('\nCould not connect to MongoDB.');
+    console.error(`Tried: ${uri}`);
+    console.error('Make sure MongoDB is installed and running - see README.md for setup steps.');
+    console.error(`Original error: ${lastErr.message}\n`);
+    process.exit(1);
   })();
   return connecting;
 }

@@ -1,0 +1,6 @@
+backend/node_modules
+backend/data
+**/*.log
+.git
+.gitignore
+README.md

@@ -1,0 +1,38 @@
+services:
+  app:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: fuel_stock_manager
+      PORT: 4000
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/backend/data
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    # Not published to the host by default - the app container reaches it
+    # over the internal Docker network as "mongo:27017". Uncomment below if
+    # you also want to connect from mongosh on your host machine, and pick a
+    # host port that isn't already used by a native MongoDB install (e.g. the
+    # Homebrew one on a Mac, which already claims 27017):
+    # ports:
+    #   - "27018:27017"
+
+volumes:
+  mongo_data:
+  app_data:

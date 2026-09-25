@@ -17,6 +17,12 @@ is sent to the internet.**
 
 ## Requirements
 
+**Using Docker?** Skip straight to "Running it with Docker" below - Docker
+Compose builds the app and runs MongoDB for you, so you don't need Node.js
+or MongoDB installed on your machine at all.
+
+Running it directly on your machine instead needs:
+
 - **Node.js 18 or newer.** Check your version with `node -v`. If you need to
   install or upgrade Node, get it from https://nodejs.org.
 - **MongoDB running locally** (or reachable via a connection string - see
@@ -89,6 +95,71 @@ MONGODB_URI="mongodb+srv://<user>:<password>@<cluster>.mongodb.net" ./start.sh
 ```
 Everything else works exactly the same either way - the app doesn't know or
 care whether MongoDB is local or in the cloud.
+
+## Running it with Docker
+
+The easiest way to run this app: Docker builds the app image and starts a
+MongoDB container for it automatically, so nothing needs to be installed on
+your machine except Docker itself.
+
+**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+(includes Docker Compose) on Mac/Windows, or Docker Engine + the Compose
+plugin on Linux.
+
+**Start it:**
+```
+docker compose up --build
+```
+The first run builds the app image, pulls the official `mongo:7` image, and
+starts both containers. Wait for a line like `Fuel Stock Manager running at
+http://localhost:4000`, then open that address in your browser. The database
+is created and seeded automatically on first start, same as running it
+directly.
+
+To run it in the background instead (so you can close the terminal):
+```
+docker compose up -d --build
+```
+
+**View logs** (useful when running with `-d`):
+```
+docker compose logs -f
+```
+
+**Stop it:**
+```
+docker compose down
+```
+This stops and removes the containers, but keeps your data (see below). Run
+`docker compose up` again any time to pick up right where you left off.
+
+**Your data persists** between runs (and even across `docker compose down`)
+in two named Docker volumes: `mongo_data` (the MongoDB database itself) and
+`app_data` (the `secret.key` file that signs login sessions). They're only
+removed if you explicitly run `docker compose down -v` - do that only if you
+actually want to wipe everything and start fresh.
+
+**Inspecting the database** while it's running in Docker:
+```
+docker compose exec mongo mongosh fuel_stock_manager
+```
+This opens a `mongosh` shell inside the MongoDB container, already connected
+to the right database - no separate MongoDB install needed on your machine.
+(If you'd rather connect from a MongoDB GUI tool like Compass on your host
+machine, uncomment the `ports: - "27018:27017"` lines for the `mongo`
+service in `docker-compose.yml` first, then connect to
+`mongodb://localhost:27018`. Port 27018 rather than the default 27017 is
+used so this doesn't clash with a MongoDB you may already have installed
+natively on your machine.)
+
+**Changing the port:** by default the app is reachable at
+`http://localhost:4000`, matching the non-Docker instructions above. To use
+a different host port, edit the `ports:` line under the `app` service in
+`docker-compose.yml`, e.g. `"4100:4000"` to use port 4100.
+
+**Rebuilding after you change the code:** `docker compose up --build` always
+rebuilds if `backend/` or `frontend/` changed; add `--force-recreate` if you
+want to be extra sure a stale container isn't reused.
 
 ## Default logins
 
@@ -184,6 +255,9 @@ there is no built-in HTTPS, so don't expose this port to the internet as-is.
 
 ```
 fuel-stock-app/
+  Dockerfile              app image build (see "Running it with Docker")
+  docker-compose.yml       app + MongoDB containers, wired together
+  .dockerignore
   backend/
     src/
       server.js        entry point - HTTP server + static file serving
@@ -215,3 +289,14 @@ fuel-stock-app/
   in it you want to keep), and restart; this reseeds the default logins
   above. If another account can still log in, it's simpler to just use that
   account to reset the owner's password from the Users screen instead.
+- **(Docker) "port is already allocated"** - something on your machine is
+  already using port 4000 (perhaps a non-Docker copy of this app you ran
+  earlier). Either stop that, or change the host port in `docker-compose.yml`
+  (see "Changing the port" above).
+- **(Docker) app container keeps restarting / can't reach MongoDB** - check
+  `docker compose logs app`. Compose starts the `mongo` container first and
+  waits for its healthcheck before starting `app`, so this is usually a sign
+  the `mongo` container itself failed - check `docker compose logs mongo` too.
+- **(Docker) changes to the code aren't showing up** - run
+  `docker compose up --build` (not just `docker compose up`) so the image
+  gets rebuilt with your latest changes.
